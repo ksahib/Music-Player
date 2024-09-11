@@ -89,35 +89,56 @@ class _MusicListPageState extends State<MusicListPage> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.black,
-      ),
-      body: Stack(
-        children: <Widget>[
-          Container(
-            width: double.infinity,
-            height: double.infinity,
-            color: Colors.grey[700],
-          ),
-          songs.isEmpty?
-          Center(child: Text("No songs found"))
-          : ListView.builder(
-              itemCount: songs.length,
-              itemBuilder: (context, index) {
-                File song = songs[index];
-                return ListTile(
-                  title: Text(song.path.split(r'\').last),
-                  textColor: Colors.white,
-                  onTap: () => playSong(song),
-                );
-              },
-            ),
-        ],
-      ),
-    );
-  }
+Widget build(BuildContext context) {
+  return Scaffold(
+    appBar: AppBar(
+      backgroundColor: Colors.black,
+    ),
+    body: Stack(
+      children: <Widget>[
+        Container(
+          width: double.infinity,
+          height: double.infinity,
+          color: Colors.grey[700],
+        ),
+        songs.isEmpty
+            ? Center(child: Text("No songs found"))
+            : ListView.builder(
+                itemCount: songs.length,
+                itemBuilder: (context, index) {
+                  File song = songs[index];
+                  return ListTile(
+                    leading: FutureBuilder<Uint8List?>(
+                      future: getAlbumArt(song),
+                      builder: (context, snapshot) {
+                        if (snapshot.hasData && snapshot.data != null) {
+                          return Image.memory(
+                            snapshot.data!,
+                            width: 50,
+                            height: 50,
+                            fit: BoxFit.cover,
+                          );
+                        } else {
+                          return Image.asset(
+                            'assets/images/album_art_placeholder.jpg', // Default image
+                            width: 40,
+                            height: 40,
+                            fit: BoxFit.cover,
+                          );
+                        }
+                      },
+                    ),
+                    title: Text(song.path.split(r'\').last),
+                    textColor: Colors.white,
+                    onTap: () => playSong(song),
+                  );
+                },
+              ),
+      ],
+    ),
+  );
+}
+
 
   void playSong(File song) {
   // Navigate to the MusicPlayer screen
