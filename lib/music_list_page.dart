@@ -2,7 +2,11 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
+import 'package:flutter/material.dart';
+import 'package:mime/mime.dart';
+import 'package:metadata_god/metadata_god.dart';
+import 'dart:typed_data';
+import 'package:flutter/services.dart';
 import 'dart:io';
 
 Future<List<File>> pickMusicFolder() async {
@@ -46,6 +50,17 @@ Future<List<File>> loadSongsFromStoredDirectory() async {
 }
 
 
+Future<Uint8List?> getAlbumArt(File song) async {
+  try {
+    Metadata metadata = await MetadataGod.readMetadata(file:song.path);
+    return Uint8List.fromList(metadata.picture!.data);
+  } catch (e) {
+    print('Error fetching album art: $e');
+    return null;
+  }
+}
+
+
 class MusicListPage extends StatefulWidget {
   @override
   _MusicListPageState createState() => _MusicListPageState();
@@ -79,19 +94,28 @@ class _MusicListPageState extends State<MusicListPage> {
       appBar: AppBar(
         backgroundColor: Colors.black,
       ),
-      body: songs.isEmpty
-          ? Center(child: Text("No songs found"))
+      body: Stack(
+        children: <Widget>[
+          Container(
+            width: double.infinity,
+            height: double.infinity,
+            color: Colors.grey[700],
+          ),
+          songs.isEmpty?
+          Center(child: Text("No songs found"))
           : ListView.builder(
               itemCount: songs.length,
               itemBuilder: (context, index) {
                 File song = songs[index];
                 return ListTile(
-                  title: Text(song.path.split('/').last),
+                  title: Text(song.path.split(r'\').last),
                   textColor: Colors.white,
                   onTap: () => playSong(song),
                 );
               },
             ),
+        ],
+      ),
     );
   }
 
@@ -158,7 +182,7 @@ class _MusicPlayerState extends State<MusicPlayer> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.song.path.split('/').last),
+        title: Text(widget.song.path.split(r'\').last),
       ),
       body: Column(
         mainAxisAlignment: MainAxisAlignment.center,
