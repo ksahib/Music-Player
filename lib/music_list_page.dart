@@ -53,6 +53,7 @@ class _MusicListPageState extends State<MusicListPage> {
   DirectoryWatcher? _directoryWatcher;
   StreamSubscription<WatchEvent>? _directoryWatcherSubscription;
   String? storedDirectory;
+  Color containerColor = const Color.fromARGB(255, 75, 74, 74);
 
   @override
   void initState() {
@@ -86,6 +87,27 @@ class _MusicListPageState extends State<MusicListPage> {
 
     return img.getColor(r, g, b, a);
   }
+
+    Future<void> handleHover(File song) async {
+    Uint8List? albumArt = await getAlbumArt(song);
+    if (albumArt != null) {
+      img.Image? albumArtImage = img.decodeImage(albumArt);
+
+      if (albumArtImage != null) {
+        int darkestColor = findDarkest(albumArtImage);
+
+        // Update the state to change the gradient
+        setState(() {
+          containerColor = Color(darkestColor);
+        });
+      } else {
+        print('Failed to decode image');
+      }
+    } else {
+      print('No album art available for this song.');
+    }
+  }
+
 
   void loadSongs() async {
     storedDirectory = await getStoredDirectory();
@@ -144,7 +166,7 @@ class _MusicListPageState extends State<MusicListPage> {
     super.dispose();
   }
 
-  @override
+ @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -155,66 +177,110 @@ class _MusicListPageState extends State<MusicListPage> {
           Container(
             width: double.infinity,
             height: double.infinity,
-            color: Colors.grey[700],
+            color: Colors.black,
           ),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: <Widget>[
-              Container(
-                width: 250,
-                height: double.infinity,
-                decoration: BoxDecoration(
-                  color: Colors.black,
-                  borderRadius: BorderRadius.circular(12.0),
-                ),
+              Stack(
+                children: <Widget>[
+                  Container(
+                    width: 250,
+                    height: double.infinity,
+                    decoration: const BoxDecoration(
+                      color: Color.fromARGB(255, 27, 26, 26),
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(0),
+                        bottomLeft: Radius.circular(0),
+                        bottomRight: Radius.circular(0),
+                        topRight: Radius.circular(12.0),
+                      ),
+                    ),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: <Widget>[
+                        Icon(
+                          Icons.my_library_music_rounded,
+                          size: 25.0,
+                          color: Colors.grey,
+                        ),
+                        Padding(
+                          padding: EdgeInsets.only(
+                            left: 20,
+                            top: 0,
+                            bottom: 0,
+                            right: 0,
+                          ),
+                          child: const Text(
+                            "Your Playlist",
+                            style: TextStyle(
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
               Expanded(
-                child: Container(
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12.0),
-                    gradient: const LinearGradient(
-                      begin: Alignment(1,-1.5),
-                      end: Alignment(1,1),
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(12.0),
+                      bottomLeft: Radius.circular(0),
+                      bottomRight: Radius.circular(0),
+                      topRight: Radius.circular(0),
+                    ),
+                    gradient: LinearGradient(
+                      begin: Alignment(1, -1.5),
+                      end: Alignment(1, 1),
                       colors: [
-                        Colors.cyan,
+                        containerColor, // Dynamic color
                         Colors.black,
                       ],
-                ),
+                    ),
                   ),
                   child: songs.isEmpty
-                ? Center(child: Text("No songs found"))
-                : ListView.builder(
-                    itemCount: songs.length,
-                    itemBuilder: (context, index) {
-                      File song = songs[index];
-                      return ListTile(
-                        leading: FutureBuilder<Uint8List?>(
-                          future: getAlbumArt(song),
-                          builder: (context, snapshot) {
-                            if (snapshot.hasData && snapshot.data != null) {
-                              return Image.memory(
-                                snapshot.data!,
-                                width: 43,
-                                height: 43,
-                                fit: BoxFit.cover,
-                              );
-                            } else {
-                              return Image.asset(
-                                'assets/images/album_art_placeholder.jpg', // Default image
-                                width: 43,
-                                height: 43,
-                                fit: BoxFit.cover,
-                              );
-                            }
+                      ? const Center(child: Text("No songs found"))
+                      : ListView.builder(
+                          itemCount: songs.length,
+                          itemBuilder: (context, index) {
+                            File song = songs[index];
+                            return MouseRegion(
+                              onEnter: (_) => handleHover(song),
+                              child: ListTile(
+                                leading: FutureBuilder<Uint8List?>(
+                                  future: getAlbumArt(song),
+                                  builder: (context, snapshot) {
+                                    if (snapshot.hasData && snapshot.data != null) {
+                                      return Image.memory(
+                                        snapshot.data!,
+                                        width: 43,
+                                        height: 43,
+                                        fit: BoxFit.cover,
+                                      );
+                                    } else {
+                                      return Image.asset(
+                                        'assets/images/album_art_placeholder.jpg',
+                                        width: 43,
+                                        height: 43,
+                                        fit: BoxFit.cover,
+                                      );
+                                    }
+                                  },
+                                ),
+                                title: Text(song.path.split(r'\').last),
+                                textColor: Colors.white,
+                                onTap: () => playSong(song),
+                              ),
+                            );
                           },
                         ),
-                        title: Text(song.path.split(r'\').last), // Fixed backslash issue
-                        textColor: Colors.white,
-                        onTap: () => playSong(song),
-                        
-                      );
-                    },
-                  ),
                 ),
               ),
             ],
