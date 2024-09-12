@@ -48,12 +48,13 @@ class MusicListPage extends StatefulWidget {
   _MusicListPageState createState() => _MusicListPageState();
 }
 
+Color containerColor = const Color.fromARGB(255, 75, 74, 74);
+
 class _MusicListPageState extends State<MusicListPage> {
   List<File> songs = [];
   DirectoryWatcher? _directoryWatcher;
   StreamSubscription<WatchEvent>? _directoryWatcherSubscription;
   String? storedDirectory;
-  Color containerColor = const Color.fromARGB(255, 75, 74, 74);
 
   @override
   void initState() {
@@ -312,12 +313,30 @@ class MusicPlayer extends StatefulWidget {
 class _MusicPlayerState extends State<MusicPlayer> {
   AudioPlayer audioPlayer = AudioPlayer();
   bool isPlaying = false;
+  Duration duration = Duration.zero;
+  Duration position = Duration.zero;
 
   @override
   void initState() {
     super.initState();
     playSong();
+     // Listen for changes in the duration of the audio
+    audioPlayer.onDurationChanged.listen((newDuration) {
+      setState(() {
+        duration = newDuration;
+      });
+    });
+
+  // Listen for changes in the position of the audio (current playback position)
+    audioPlayer.onPositionChanged.listen((newPosition) {
+      setState(() {
+        position = newPosition;
+      });
+    });
+    
   }
+
+  
 
   Future<void> playSong() async {
     // Play the song using the DeviceFileSource (local file)
@@ -341,6 +360,8 @@ class _MusicPlayerState extends State<MusicPlayer> {
     });
   }
 
+  
+
   @override
   void dispose() {
     audioPlayer.dispose();
@@ -349,33 +370,65 @@ class _MusicPlayerState extends State<MusicPlayer> {
 
   @override
   Widget build(BuildContext context) {
+  final screenWidth = MediaQuery.of(context).size.width;
+  final screenHeight = MediaQuery.of(context).size.height;
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.song.path.split(r'\').last), // Fixed backslash issue
+        backgroundColor: containerColor,
+        title: Text(widget.song.path.split(r'\').last),
       ),
-      body: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(isPlaying ? "Playing..." : "Paused"),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+      body: Stack(
             children: [
-              IconButton(
-                icon: Icon(Icons.play_arrow),
-                onPressed: isPlaying ? null : playSong,
+              Container(
+                width: screenWidth,
+                height: screenHeight - 56,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment(1,-1.5),
+                    end: Alignment(1,1),
+                    colors: [
+                      containerColor,
+                      const Color.fromARGB(255, 29, 27, 27),
+                    ],
+                  ),
+                ),
               ),
-              IconButton(
-                icon: Icon(Icons.pause),
-                onPressed: isPlaying ? pauseSong : null,
-              ),
-              IconButton(
-                icon: Icon(Icons.stop),
-                onPressed: stopSong,
+
+              Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Slider(
+                    min: 0,
+                    max: duration.inSeconds.toDouble(),
+                    value: position.inSeconds.toDouble(),
+                    onChanged: (value) async {
+                      final position = Duration(seconds: value.toInt());
+                      await audioPlayer.seek(position);
+
+                    },
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      IconButton(
+                        icon: Icon(Icons.play_arrow),
+                        onPressed: isPlaying ? null : playSong,
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.pause),
+                        onPressed: isPlaying ? pauseSong : null,
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.stop),
+                        onPressed: stopSong,
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ],
           ),
-        ],
-      ),
-    );
-  }
+        );
+   }
 }
+
