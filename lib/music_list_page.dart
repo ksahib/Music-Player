@@ -21,7 +21,7 @@ Future<List<File>> pickMusicFolder() async {
   }
 
   SharedPreferences prefs = await SharedPreferences.getInstance();
-  await prefs.setString('music_directory', selectedDirectory); // Corrected key to 'music_directory'
+  await prefs.setString('music_directory', selectedDirectory); 
 
   // Get all files in the folder
   Directory dir = Directory(selectedDirectory);
@@ -109,7 +109,7 @@ class _MusicListPageState extends State<MusicListPage> {
   int avgBlue = (sqrt(totalBlue / totalPixels)).round();
   int avgAlpha = (totalAlpha / totalPixels).round();
 
-  // Return the weighted average color
+  
   return img.getColor(avgRed, avgGreen, avgBlue, avgAlpha);
 }
 
@@ -342,7 +342,7 @@ class _MusicPlayerState extends State<MusicPlayer> {
   Image? coverArtImage;
   Directory musicDirectory = Directory(storedDirectory!); 
   List<FileSystemEntity> allFiles = [];
-  int currentFileIndex = 0; // Track the current file index  
+  int currentFileIndex = 0;  
   // Store the subscriptions
   StreamSubscription? durationSubscription;
   StreamSubscription? positionSubscription;
@@ -362,21 +362,21 @@ class _MusicPlayerState extends State<MusicPlayer> {
     loadCoverArt();
     playSong();
 
-    // Listen for changes in the duration and store the subscription
+    // Listen for changes in the duration
     durationSubscription = audioPlayer.onDurationChanged.listen((newDuration) {
       setState(() {
         duration = newDuration;
       });
     });
 
-    // Listen for changes in the position and store the subscription
+    // Listen for changes in the position
     positionSubscription = audioPlayer.onPositionChanged.listen((newPosition) {
       setState(() {
         position = newPosition;
       });
     });
 
-    // Listen for player state changes and handle song end
+    // Listen for player state changes
     playerStateSubscription = audioPlayer.onPlayerStateChanged.listen((PlayerState state) {
       if (state == PlayerState.completed) {
         _handleSongEnd();
@@ -422,12 +422,12 @@ Future<void> nextSong() async {
   if (currentFileIndex < allFiles.length - 1) {
     setState(() {
       currentFileIndex++;
-      currentSong = File(allFiles[currentFileIndex].path); // Update the current song
+      currentSong = File(allFiles[currentFileIndex].path); 
     });
     artist = await getArtist(currentSong);
     await stopSong();
     loadCoverArt();
-    widget.handleHover(currentSong); // Call the handleHover method
+    widget.handleHover(currentSong);
     await playSong();
   }
 }
@@ -436,12 +436,12 @@ Future<void> previousSong() async {
   if (currentFileIndex > 0) {
     setState(() {
       currentFileIndex--;
-      currentSong = File(allFiles[currentFileIndex].path); // Update the current song
+      currentSong = File(allFiles[currentFileIndex].path); 
     });
     artist = await getArtist(currentSong);
     await stopSong();
     loadCoverArt();
-    widget.handleHover(currentSong); // Call the handleHover method
+    widget.handleHover(currentSong); 
     await playSong();
   }
 }
@@ -576,7 +576,6 @@ Future<void> _handleSongEnd() async {
     durationSubscription?.cancel();
     positionSubscription?.cancel();
     playerStateSubscription?.cancel();
-    // Dispose of the audio player to free resources
     audioPlayer.dispose();
     super.dispose();
 }
