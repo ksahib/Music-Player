@@ -10,6 +10,7 @@ import 'package:flutter/services.dart';
 import 'package:image/image.dart' as img;
 import 'dart:io';
 import 'dart:async';
+import 'dart:math';
 
 Future<List<File>> pickMusicFolder() async {
   // Open folder picker
@@ -38,23 +39,37 @@ Future<Uint8List?> getAlbumArt(File song) async {
     Metadata metadata = await MetadataGod.readMetadata(file: song.path);
     return Uint8List.fromList(metadata.picture!.data);
   } catch (e) {
-    print('Error fetching album art: $e');
+      print('Error fetching album art: $e');
+    
     return null;
   }
 }
 
+Future<String> getArtist(File song) async {
+  try {
+    Metadata metadata = await MetadataGod.readMetadata(file: song.path);
+    return metadata.artist ?? 'Unknown Artist';
+  } catch (e) {
+    print('Error fetching artist: $e');
+    return 'Unknown Artist';
+  }
+}
+
 class MusicListPage extends StatefulWidget {
+  const MusicListPage({super.key});
+
   @override
   _MusicListPageState createState() => _MusicListPageState();
 }
 
 Color containerColor = const Color.fromARGB(255, 75, 74, 74);
+String? storedDirectory;
 
 class _MusicListPageState extends State<MusicListPage> {
   List<File> songs = [];
   DirectoryWatcher? _directoryWatcher;
   StreamSubscription<WatchEvent>? _directoryWatcherSubscription;
-  String? storedDirectory;
+  
 
   @override
   void initState() {
@@ -65,29 +80,39 @@ class _MusicListPageState extends State<MusicListPage> {
 
    Future<void> initializeMetadataGod() async {
     MetadataGod.initialize(); // Initialization of MetadataGod
-    print('MetadataGod initialized'); // Debugging output
   }
 
   int findDarkest(img.Image image) {
-    int r = 255, g = 255, b = 255, a=255;
+  double totalRed = 0;
+  double totalGreen = 0;
+  double totalBlue = 0;
+  double totalAlpha = 0;
+  int totalPixels = 0;
 
-    for(int y = 0; y < image.height; y++) {
-      for(int x = 0; x < image.width; x++) {
-        int color = image.getPixel(x,y);
-        int red = img.getRed(color);
-        int green = img.getGreen(color);
-        int blue = img.getBlue(color);
-        int alpha = img.getAlpha(color);
-
-        if(red < r) r = red;
-        if(green < g) g = green;
-        if(blue < b) b = blue;
-        if(a < alpha) a = alpha;
-      }
+  for (int y = 0; y < image.height; y++) {
+    for (int x = 0; x < image.width; x++) {
+      int color = image.getPixel(x, y);
+      int red = img.getRed(color);
+      int green = img.getGreen(color);
+      int blue = img.getBlue(color);
+      int alpha = img.getAlpha(color);
+      totalRed += red * red;
+      totalGreen += green * green;
+      totalBlue += blue * blue;
+      totalAlpha += alpha;
+      totalPixels++;
     }
-
-    return img.getColor(r, g, b, a);
   }
+
+  int avgRed = (sqrt(totalRed / totalPixels)).round();
+  int avgGreen = (sqrt(totalGreen / totalPixels)).round();
+  int avgBlue = (sqrt(totalBlue / totalPixels)).round();
+  int avgAlpha = (totalAlpha / totalPixels).round();
+
+  // Return the weighted average color
+  return img.getColor(avgRed, avgGreen, avgBlue, avgAlpha);
+}
+
 
     Future<void> handleHover(File song) async {
     Uint8List? albumArt = await getAlbumArt(song);
@@ -105,16 +130,16 @@ class _MusicListPageState extends State<MusicListPage> {
         print('Failed to decode image');
       }
     } else {
-      print('No album art available for this song.');
+      setState(() {
+        containerColor = Colors.grey;
+      });
     }
   }
 
 
   void loadSongs() async {
     storedDirectory = await getStoredDirectory();
-    if (storedDirectory == null) {
-      storedDirectory = await selectDirectory();
-    }
+    storedDirectory ??= await selectDirectory();
 
     if (storedDirectory != null) {
       await loadSongsFromStoredDirectory(storedDirectory!);
@@ -137,23 +162,21 @@ class _MusicListPageState extends State<MusicListPage> {
 
   Future<String?> getStoredDirectory() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    return prefs.getString('music_directory'); // Corrected key to 'music_directory'
+    return prefs.getString('music_directory');
   }
 
   Future<String?> selectDirectory() async {
     String? selectedDirectory = await FilePicker.platform.getDirectoryPath();
     if (selectedDirectory != null) {
       SharedPreferences prefs = await SharedPreferences.getInstance();
-      await prefs.setString('music_directory', selectedDirectory); // Corrected key to 'music_directory'
+      await prefs.setString('music_directory', selectedDirectory); 
     }
     return selectedDirectory;
   }
 
   void watchDirectoryChanges(String directoryPath) {
-    print('Watching directory: $directoryPath'); // Debugging line
     _directoryWatcher = DirectoryWatcher(directoryPath);
     _directoryWatcherSubscription = _directoryWatcher!.events.listen((event) {
-      print('Directory change detected: ${event.type}'); // Debugging line
 
       if (event.type == ChangeType.ADD || event.type == ChangeType.REMOVE || event.type == ChangeType.MODIFY) {
         loadSongsFromStoredDirectory(directoryPath); // Refresh the list of songs
@@ -215,7 +238,7 @@ class _MusicListPageState extends State<MusicListPage> {
                             bottom: 0,
                             right: 0,
                           ),
-                          child: const Text(
+                          child: Text(
                             "Your Playlist",
                             style: TextStyle(
                               color: Colors.white,
@@ -238,8 +261,8 @@ class _MusicListPageState extends State<MusicListPage> {
                       topRight: Radius.circular(0),
                     ),
                     gradient: LinearGradient(
-                      begin: Alignment(1, -1.5),
-                      end: Alignment(1, 1),
+                      begin: const Alignment(1, -1.5),
+                      end: const Alignment(1, 1),
                       colors: [
                         containerColor, // Dynamic color
                         Colors.black,
@@ -296,15 +319,16 @@ class _MusicListPageState extends State<MusicListPage> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => MusicPlayer(song: song), // Pass the selected song
+        builder: (context) => MusicPlayer(song: song, handleHover: handleHover,), // Pass the selected song
       ),
     );
   }
 }
 
 class MusicPlayer extends StatefulWidget {
-  final File song;
-  const MusicPlayer({Key? key, required this.song}) : super(key: key);
+  File song;
+  Function(File song) handleHover;
+  MusicPlayer({super.key, required this.song, required this.handleHover});
 
   @override
   _MusicPlayerState createState() => _MusicPlayerState();
@@ -315,36 +339,62 @@ class _MusicPlayerState extends State<MusicPlayer> {
   bool isPlaying = false;
   Duration duration = Duration.zero;
   Duration position = Duration.zero;
+  Image? coverArtImage;
+  Directory musicDirectory = Directory(storedDirectory!); 
+  List<FileSystemEntity> allFiles = [];
+  int currentFileIndex = 0; // Track the current file index  
+  // Store the subscriptions
+  StreamSubscription? durationSubscription;
+  StreamSubscription? positionSubscription;
+  StreamSubscription? playerStateSubscription;
+  File currentSong = File('');
+  String artist = 'Unknown Artist';
 
   @override
   void initState() {
     super.initState();
+    // Load the music files from the directory
+    allFiles = musicDirectory.listSync().where((file) => file.path.endsWith('.mp3')).toList();
+    
+    // Get the current song index based on the passed file
+    currentFileIndex = allFiles.indexWhere((file) => file.path == widget.song.path);
+    currentSong = File(allFiles[currentFileIndex].path);
+    loadCoverArt();
     playSong();
-     // Listen for changes in the duration of the audio
-    audioPlayer.onDurationChanged.listen((newDuration) {
+
+    // Listen for changes in the duration and store the subscription
+    durationSubscription = audioPlayer.onDurationChanged.listen((newDuration) {
       setState(() {
         duration = newDuration;
       });
     });
 
-  // Listen for changes in the position of the audio (current playback position)
-    audioPlayer.onPositionChanged.listen((newPosition) {
+    // Listen for changes in the position and store the subscription
+    positionSubscription = audioPlayer.onPositionChanged.listen((newPosition) {
       setState(() {
         position = newPosition;
       });
     });
-    
-  }
 
+    // Listen for player state changes and handle song end
+    playerStateSubscription = audioPlayer.onPlayerStateChanged.listen((PlayerState state) {
+      if (state == PlayerState.completed) {
+        _handleSongEnd();
+      }
+    });
+
+  }
   
 
   Future<void> playSong() async {
-    // Play the song using the DeviceFileSource (local file)
-    await audioPlayer.play(DeviceFileSource(widget.song.path));
-    setState(() {
-      isPlaying = true;
-    });
-  }
+  // Play the song at the current index
+  await audioPlayer.play(DeviceFileSource(allFiles[currentFileIndex].path));
+  artist = await getArtist(currentSong);
+  setState(() {
+    isPlaying = true;
+  });
+}
+
 
   Future<void> pauseSong() async {
     await audioPlayer.pause();
@@ -360,75 +410,178 @@ class _MusicPlayerState extends State<MusicPlayer> {
     });
   }
 
-  
-
-  @override
-  void dispose() {
-    audioPlayer.dispose();
-    super.dispose();
+  Future<void> togglePlayback() async {
+    if (isPlaying) {
+      await pauseSong();
+    } else {
+      await playSong();
+    }
   }
+
+Future<void> nextSong() async {
+  if (currentFileIndex < allFiles.length - 1) {
+    setState(() {
+      currentFileIndex++;
+      currentSong = File(allFiles[currentFileIndex].path); // Update the current song
+    });
+    artist = await getArtist(currentSong);
+    await stopSong();
+    loadCoverArt();
+    widget.handleHover(currentSong); // Call the handleHover method
+    await playSong();
+  }
+}
+
+Future<void> previousSong() async {
+  if (currentFileIndex > 0) {
+    setState(() {
+      currentFileIndex--;
+      currentSong = File(allFiles[currentFileIndex].path); // Update the current song
+    });
+    artist = await getArtist(currentSong);
+    await stopSong();
+    loadCoverArt();
+    widget.handleHover(currentSong); // Call the handleHover method
+    await playSong();
+  }
+}
+
+Future<void> _handleSongEnd() async {
+  await nextSong();
+}
+
+ void loadCoverArt() async {
+  Uint8List? albumArt = await getAlbumArt(File(allFiles[currentFileIndex].path));
+
+  if (albumArt != null) {
+    setState(() {
+      coverArtImage = Image.memory(
+        albumArt,
+        fit: BoxFit.cover,
+        width: 200,
+        height: 200,
+      );
+    });
+  } else {
+    setState(() {
+      coverArtImage = Image.asset(
+        'assets/images/album_art_placeholder.jpg',
+        fit: BoxFit.cover,
+        width: 200,
+        height: 200,
+      );
+    });
+  }
+}
+
 
   @override
   Widget build(BuildContext context) {
-  final screenWidth = MediaQuery.of(context).size.width;
-  final screenHeight = MediaQuery.of(context).size.height;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: containerColor,
-        title: Text(widget.song.path.split(r'\').last),
       ),
       body: Stack(
+        children: [
+          Container(
+            width: screenWidth,
+            height: screenHeight - 56,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: const Alignment(1, -1.5),
+                end: const Alignment(1, 1),
+                colors: [
+                  containerColor,
+                  const Color.fromARGB(255, 29, 27, 27),
+                ],
+              ),
+            ),
+          ),
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Container(
-                width: screenWidth,
-                height: screenHeight - 56,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment(1,-1.5),
-                    end: Alignment(1,1),
-                    colors: [
-                      containerColor,
-                      const Color.fromARGB(255, 29, 27, 27),
-                    ],
+              Card(
+                elevation: 8.0,
+                child: ClipRRect(
+                  child: coverArtImage ?? const SizedBox(
+                    width: 200,
+                    height: 200,
+                    //child: CircularProgressIndicator(),  // Loading indicator until image is ready
                   ),
                 ),
               ),
-
-              Column(
+              //song title
+              Text(
+                currentSong?.path.split(r'\').last.replaceAll('.mp3', '') ?? 'No song selected',
+                style: const TextStyle(
+                  fontSize: 20.0,
+                  color: Colors.white,
+                ),
+              ),
+              Text(
+                artist,
+                style: TextStyle(
+                  fontSize: 16.0,
+                  color: Colors.grey[350],
+                ),
+              ),
+              Slider(
+                min: 0,
+                max: duration.inSeconds.toDouble(),
+                activeColor: Colors.white,
+                value: position.inSeconds.toDouble(),
+                onChanged: (value) async {
+                  final position = Duration(seconds: value.toInt());
+                  await audioPlayer.seek(position);
+                },
+              ),
+              Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Slider(
-                    min: 0,
-                    max: duration.inSeconds.toDouble(),
-                    value: position.inSeconds.toDouble(),
-                    onChanged: (value) async {
-                      final position = Duration(seconds: value.toInt());
-                      await audioPlayer.seek(position);
-
-                    },
+                  IconButton(
+                    icon: const Icon(
+                      Icons.skip_previous,
+                      color: Colors.white,
+                      ),
+                    onPressed: previousSong,
                   ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      IconButton(
-                        icon: Icon(Icons.play_arrow),
-                        onPressed: isPlaying ? null : playSong,
+                  IconButton(
+                    icon: Icon(
+                      isPlaying ? Icons.pause : Icons.play_arrow,
+                      color: Colors.white,
                       ),
-                      IconButton(
-                        icon: Icon(Icons.pause),
-                        onPressed: isPlaying ? pauseSong : null,
+                    onPressed: togglePlayback,
+                  ),
+                  IconButton(
+                    icon: const Icon(
+                      Icons.skip_next,
+                      color: Colors.white,
                       ),
-                      IconButton(
-                        icon: Icon(Icons.stop),
-                        onPressed: stopSong,
-                      ),
-                    ],
+                    onPressed: nextSong,
                   ),
                 ],
               ),
             ],
           ),
-        );
-   }
+        ],
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    durationSubscription?.cancel();
+    positionSubscription?.cancel();
+    playerStateSubscription?.cancel();
+    // Dispose of the audio player to free resources
+    audioPlayer.dispose();
+    super.dispose();
 }
+
+}
+
+
 
