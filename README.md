@@ -6,4 +6,5 @@ Main page:
 Now playing page:
 ![image](https://github.com/user-attachments/assets/510a4aa7-7cc7-43f3-b7b7-95058c9abf1c)
 ![image](https://github.com/user-attachments/assets/c7d351c3-712a-405a-b772-556f726127a0)
+
 The background gradients change based on the color of the cover art
