@@ -1,4 +1,5 @@
-Native Windows music player app developed in flutter. Currently has most of the basic functionalities. Inspired by Spotify's UI
+Native Windows music player app developed in flutter. Currently has most of the basic functionalities. Inspired by Spotify's UI.
+
 Main page:
 ![image](https://github.com/user-attachments/assets/afbe390c-7f01-49eb-b704-c3a998424216)
 ![image](https://github.com/user-attachments/assets/00039c4e-5239-45d8-83df-3321e325996c)
